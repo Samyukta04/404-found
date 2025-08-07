@@ -177,6 +177,10 @@ if 'analysis_results' not in st.session_state:
 if 'form_submitted' not in st.session_state:
     st.session_state.form_submitted = False
 
+# Initialize show_analysis state for each customer
+if 'show_analysis' not in st.session_state:
+    st.session_state.show_analysis = {}
+
 # Header
 st.markdown("""
 <div class="hero-container">
@@ -420,28 +424,25 @@ if st.session_state.customers:
                                 max_tokens=350,
                                 temperature=0.7
                             )
-
                             analysis = response.choices[0].message.content
                             st.session_state.analysis_results[customer_key] = analysis
-
+                            st.session_state.show_analysis[customer_key] = True  # Show analysis
                         except Exception as e:
                             st.error(f"Analysis error: {str(e)}")
 
             # Display analysis in properly formatted container
-            if customer_key in st.session_state.analysis_results:
+            if st.session_state.show_analysis.get(customer_key, False):
                 st.markdown(f"""
                 <div class="analysis-container">
                     <h4>🧠 AI Strategic Analysis - {customer['name']}</h4>
                     <div style="white-space: pre-wrap; line-height: 1.5; font-size: 0.9rem;">
 {st.session_state.analysis_results[customer_key]}
                     </div>
-                    <button onclick="this.parentElement.style.display='none'" 
-                            style="background: #dc3545; color: white; border: none; padding: 0.3rem 0.8rem; 
-                                   border-radius: 5px; cursor: pointer; float: right; margin-top: 0.5rem;">
-                        ✕ Close
-                    </button>
                 </div>
                 """, unsafe_allow_html=True)
+                if st.button(f"🟥 ✕ Close Analysis {customer_key}", key=f"close_{customer_key}_{i}"):
+                    st.session_state.show_analysis[customer_key] = False
+                    st.rerun()
 
     with col2:
         st.markdown("### 📊 Real-Time Portfolio Metrics")

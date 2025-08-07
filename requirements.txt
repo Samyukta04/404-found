@@ -6,3 +6,8 @@ python-dotenv
 yfinance
 numpy
 scikit-learn
+streamlit-authenticator
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+requests
