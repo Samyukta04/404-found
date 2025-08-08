@@ -18,8 +18,7 @@ This project is a real-time AI-powered credit optimization platform built with S
 1. **Clone the repository:**
 
 ```bash
-git clone 
-cd 
+git clone https://github.com/Samyukta04/404-found/
 ```
 
 2. **Create and activate a Python virtual environment:**
@@ -45,7 +44,15 @@ pip install -r requirements.txt
 4. **Create a `.env` file in the root directory** with the following environment variables:
 
 ```
-GROQ_API_KEY=your_groq_api_key_here
+GROQ_API_KEY= enter your value
+GOOGLE_CLIENT_ID= enter your value
+GOOGLE_CLIENT_SECRET= enter your value
+GOOGLE_REDIRECT_URI= enter your value
+GOOGLE_AUTH_URL= enter your value
+GOOGLE_TOKEN_URL= enter your value
+GOOGLE_USER_INFO_URL= enter your value
+GOOGLE_SCOPES=openid email profile
+ADMIN_EMAILS= enter your value
 
 ```
 - Replace the placeholders with your actual keys.
@@ -60,5 +67,8 @@ streamlit run app.py
 
 - The app will open in your default web browser.
 - You can input customer data, view AI recommendations, analyze portfolio metrics, and interact with the credit intelligence engine.
+
+## Live link
+https://404-found-a4rrzxz4opqt9xoyqsusgp.streamlit.app/
 
 
