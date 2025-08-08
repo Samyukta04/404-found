@@ -12,6 +12,12 @@ from dotenv import load_dotenv
 from groq import Groq
 import yfinance as yf
 import io
+import requests
+from urllib.parse import urlencode
+import base64
+import hashlib
+
+USD_TO_INR = 83  # 1 USD = 83 INR (update as needed)
 
 load_dotenv()
 
@@ -20,6 +26,165 @@ st.set_page_config(
     page_icon="🧠",
     layout="wide"
 )
+
+# ----------------------------- GOOGLE OAUTH SETUP -----------------------------
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+REDIRECT_URI = os.getenv("REDIRECT_URI", "http://localhost:8501")
+
+def generate_auth_url():
+    """Generate Google OAuth authorization URL"""
+    if not GOOGLE_CLIENT_ID:
+        return None
+    
+    params = {
+        'client_id': GOOGLE_CLIENT_ID,
+        'redirect_uri': REDIRECT_URI,
+        'scope': 'openid email profile',
+        'response_type': 'code',
+        'access_type': 'offline',
+        'prompt': 'consent'
+    }
+    
+    auth_url = f"https://accounts.google.com/o/oauth2/auth?{urlencode(params)}"
+    return auth_url
+
+def exchange_code_for_token(auth_code):
+    """Exchange authorization code for access token"""
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        return None
+    
+    token_url = "https://oauth2.googleapis.com/token"
+    token_data = {
+        'client_id': GOOGLE_CLIENT_ID,
+        'client_secret': GOOGLE_CLIENT_SECRET,
+        'redirect_uri': REDIRECT_URI,
+        'grant_type': 'authorization_code',
+        'code': auth_code
+    }
+    
+    try:
+        response = requests.post(token_url, data=token_data)
+        return response.json()
+    except Exception as e:
+        st.error(f"Token exchange failed: {str(e)}")
+        return None
+
+def get_user_info(access_token):
+    """Get user information from Google"""
+    try:
+        headers = {'Authorization': f'Bearer {access_token}'}
+        response = requests.get('https://www.googleapis.com/oauth2/v2/userinfo', headers=headers)
+        return response.json()
+    except Exception as e:
+        st.error(f"Failed to get user info: {str(e)}")
+        return None
+
+def login_page():
+    """Display login page"""
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); padding: 4rem; border-radius: 15px; color: white; text-align: center; margin: 2rem 0;">
+        <h1>🧠 Credit Intelligence Engine</h1>
+        <h2>Secure Login Required</h2>
+        <p style="font-size: 1.2rem; margin: 2rem 0;">Please authenticate with Google to access the Credit Intelligence Dashboard</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown("""
+        <div style="background: white; padding: 3rem; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center;">
+            <h3>🔐 Secure Authentication</h3>
+            <p>Sign in with your Google account to access real-time credit optimization tools</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
+            auth_url = generate_auth_url()
+            if auth_url:
+                st.markdown(f"""
+                <div style="text-align: center; margin: 2rem 0;">
+                    <a href="{auth_url}" target="_self">
+                        <button style="
+                            background: #4285f4; 
+                            color: white; 
+                            border: none; 
+                            padding: 1rem 2rem; 
+                            font-size: 1.1rem; 
+                            border-radius: 8px; 
+                            cursor: pointer;
+                            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                        ">
+                            🔑 Sign in with Google
+                        </button>
+                    </a>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.error("OAuth configuration error")
+        else:
+            st.error("⚠️ Google OAuth credentials not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your .env file")
+            
+            # Demo mode option
+            st.markdown("---")
+            st.markdown("### 🚀 Demo Mode")
+            if st.button("Continue in Demo Mode (No Authentication)", type="secondary", use_container_width=True):
+                st.session_state.authenticated = True
+                st.session_state.user_info = {
+                    'name': 'Demo User',
+                    'email': 'demo@example.com',
+                    'picture': 'https://via.placeholder.com/96'
+                }
+                st.rerun()
+        
+        st.markdown("""
+        <div style="margin-top: 3rem; padding: 1.5rem; background: #f8f9fa; border-radius: 10px;">
+            <h4>🛡️ Security Features</h4>
+            <ul style="text-align: left;">
+                <li>✅ Google OAuth 2.0 Authentication</li>
+                <li>✅ Secure Token Management</li>
+                <li>✅ Real-time Session Validation</li>
+                <li>✅ Privacy-First Data Handling</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+# ----------------------------- AUTHENTICATION FLOW -----------------------------
+# Initialize session state
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'user_info' not in st.session_state:
+    st.session_state.user_info = None
+
+# Check for OAuth callback
+query_params = st.query_params
+if 'code' in query_params and not st.session_state.authenticated:
+    with st.spinner("🔐 Authenticating with Google..."):
+        auth_code = query_params['code']
+        token_response = exchange_code_for_token(auth_code)
+        
+        if token_response and 'access_token' in token_response:
+            user_info = get_user_info(token_response['access_token'])
+            if user_info:
+                st.session_state.authenticated = True
+                st.session_state.user_info = user_info
+                st.session_state.access_token = token_response['access_token']
+                
+                # Clear the URL parameters
+                st.query_params.clear()
+                st.success("✅ Authentication successful!")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("❌ Failed to get user information")
+        else:
+            st.error("❌ Authentication failed")
+
+# Show login page if not authenticated
+if not st.session_state.authenticated:
+    login_page()
+    st.stop()
 
 # ----------------------------- STYLES -----------------------------
 st.markdown("""
@@ -81,8 +246,48 @@ st.markdown("""
     }
     .real-data-badge { background:#28a745;color:white;padding:0.2rem 0.5rem;border-radius:5px;font-size:0.7rem;margin-left:0.5rem; }
     .success-box { background:#d4edda;border:1px solid #c3e6cb;color:#155724;padding:1rem;border-radius:8px;margin:1rem 0; }
+    .user-info {
+        background: white;
+        padding: 1rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    .user-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+# ------------------------ USER INFO DISPLAY ------------------------
+if st.session_state.user_info:
+    col_user, col_logout = st.columns([4, 1])
+    
+    with col_user:
+        st.markdown(f"""
+        <div class="user-info">
+            <img src="{st.session_state.user_info.get('picture', 'https://via.placeholder.com/48')}" class="user-avatar" alt="User Avatar">
+            <div>
+                <strong>{st.session_state.user_info.get('name', 'Unknown User')}</strong><br>
+                <small style="color: #666;">{st.session_state.user_info.get('email', 'No email')}</small>
+            </div>
+            <span style="margin-left: auto; background: #28a745; color: white; padding: 0.3rem 0.8rem; border-radius: 15px; font-size: 0.8rem;">
+                🟢 Authenticated
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_logout:
+        if st.button("🚪 Logout", type="secondary", use_container_width=True):
+            # Clear session state
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
 
 # ------------------------ GROQ CLIENT ------------------------
 @st.cache_resource
@@ -142,11 +347,12 @@ if 'show_analysis' not in st.session_state:
     st.session_state.show_analysis = {}
 
 # ----------------------------- HEADER -----------------------------
-st.markdown("""
+st.markdown(f"""
 <div class="hero-container">
     <h1>Credit Intelligence Engine</h1>
     <h3>Real-Time Credit Optimization & Revenue Maximization</h3>
     <p><span class="real-time-indicator">🔴 LIVE</span> AI-Powered Customer Portfolio Management</p>
+    <p style="font-size: 0.9rem; margin-top: 1rem;">Welcome, {st.session_state.user_info.get('name', 'User')}! 🎯</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -181,11 +387,11 @@ with tab_dashboard:
         col1, col2 = st.columns(2)
         with col1:
             customer_name = st.text_input("Customer Name *", placeholder="e.g., John Smith")
-            current_limit = st.number_input("Current Credit Limit ($) *", min_value=500, max_value=100000, value=5000, step=500)
+            current_limit = st.number_input("Current Credit Limit (₹) *", min_value=500, max_value=100000, value=5000, step=500)
             utilization = st.slider("Credit Utilization (%)", 0, 100, 45)
             payment_history = st.slider("Payment History Score", 0, 100, 85)
         with col2:
-            income = st.number_input("Annual Income ($) *", min_value=25000, max_value=500000, value=65000, step=5000)
+            income = st.number_input("Annual Income (₹) *", min_value=25000, max_value=500000, value=65000, step=5000)
             risk_score = st.number_input("Risk Score (300-850)", min_value=300, max_value=850, value=650)
             months_since_increase = st.number_input("Months Since Last Increase", min_value=0, max_value=120, value=12)
             spending_category = st.selectbox("Primary Spending Category",
@@ -209,30 +415,36 @@ with tab_dashboard:
             if market_data['sp500_change'] > 1: market_factor = 1.1
             elif market_data['sp500_change'] < -1: market_factor = 0.9
 
-            recommended_limit = int(current_limit * utilization_factor * income_factor * risk_factor * time_factor * market_factor)
-            recommended_limit = max(current_limit, recommended_limit)
-            rate_reduction = max(0, (payment_history - 80) * 0.05 + (risk_score - 600) * 0.01)
+            # Convert current_limit and income to INR
+            current_limit_inr = int(current_limit * USD_TO_INR)
+            income_inr = int(income * USD_TO_INR)
 
-            increase_percentage = (recommended_limit - current_limit) / current_limit
+            # Use INR for recommended_limit calculation
+            recommended_limit_inr = int(current_limit_inr * utilization_factor * income_factor * risk_factor * time_factor * market_factor)
+            recommended_limit_inr = max(current_limit_inr, recommended_limit_inr)
+            rate_reduction = max(0, (payment_history - 80) * 0.05 + (risk_score - 600) * 0.01);
+
+            increase_percentage = (recommended_limit_inr - current_limit_inr) / current_limit_inr
             opportunity = "High" if increase_percentage > 0.3 else ("Medium" if increase_percentage > 0.1 else "Low")
 
             new_customer = {
                 "id": f"C{len(st.session_state.customers) + 1:03d}",
                 "name": customer_name.strip(),
-                "current_limit": current_limit,
+                "current_limit": current_limit_inr,
                 "utilization": utilization_decimal,
                 "payment_history": payment_history,
-                "income": income,
+                "income": income_inr,
                 "risk_score": risk_score,
                 "last_increase": f"{months_since_increase} months ago" if months_since_increase > 0 else "never",
                 "spending_trend": "analyzed",
-                "category_spend": {spending_category.lower(): int(current_limit * utilization_decimal * 0.6)},
+                "category_spend": {spending_category.lower(): int(current_limit_inr * utilization_decimal * 0.6)},
                 "opportunity": opportunity,
-                "recommended_limit": recommended_limit,
+                "recommended_limit": recommended_limit_inr,
                 "rate_reduction": rate_reduction,
                 "market_context": f"Added during {market_data['sp500_change']:+.1f}% market day",
                 "timestamp": datetime.now(),
-                "spending_category": spending_category
+                "spending_category": spending_category,
+                "added_by": st.session_state.user_info.get('email', 'unknown')  # Track who added
             }
             st.session_state.customers.append(new_customer)
 
@@ -240,10 +452,10 @@ with tab_dashboard:
             <div class="success-box">
                 <h4>✅ {customer_name.strip()} Added Successfully!</h4>
                 <ul>
-                    <li><strong>AI Recommendation:</strong> ${recommended_limit:,} limit ({increase_percentage * 100:.0f}% increase)</li>
+                    <li><strong>AI Recommendation:</strong> ₹{recommended_limit_inr:,} limit ({increase_percentage * 100:.0f}% increase)</li>
                     <li><strong>Opportunity Level:</strong> {opportunity}</li>
                     <li><strong>Potential APR Reduction:</strong> {rate_reduction:.1f}%</li>
-                    <li><strong>Revenue Impact:</strong> ${(recommended_limit - current_limit) * 0.15:,.0f} annually</li>
+                    <li><strong>Revenue Impact:</strong> ₹{(recommended_limit_inr - current_limit_inr) * 0.15:,.0f} annually</li>
                     <li><strong>Market Timing:</strong> {'Favorable' if market_data['sp500_change'] > 0 else 'Cautious approach'}</li>
                 </ul>
             </div>
@@ -263,18 +475,18 @@ with tab_dashboard:
                 <div class="customer-card {opportunity_class}">
                     <h4>{customer['name']} (ID: {customer['id']}) <span class="real-data-badge">REAL DATA</span></h4>
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin: 1rem 0;">
-                        <div><strong>Current Limit:</strong> ${customer['current_limit']:,}</div>
+                        <div><strong>Current Limit:</strong> ₹{customer['current_limit']:,}</div>
                         <div><strong>Utilization:</strong> {customer['utilization']:.0%}</div>
                         <div><strong>Risk Score:</strong> {customer['risk_score']}</div>
-                        <div><strong>Income:</strong> ${customer['income']:,}</div>
+                        <div><strong>Income:</strong> ₹{customer['income']:,}</div>
                         <div><strong>Payment History:</strong> {customer['payment_history']}%</div>
                         <div><strong>Primary Category:</strong> {customer.get('spending_category', 'N/A')}</div>
                     </div>
                     <div style="background: white; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
                         <strong>🧠 AI Recommendation:</strong><br>
-                        • Increase limit to ${customer['recommended_limit']:,} (+{((customer['recommended_limit'] / customer['current_limit']) - 1) * 100:.0f}%)<br>
+                        • Increase limit to ₹{customer['recommended_limit']:,} (+{((customer['recommended_limit'] / customer['current_limit']) - 1) * 100:.0f}%)<br>
                         • Potential APR reduction: {customer['rate_reduction']:.1f}%<br>
-                        • Estimated annual revenue increase: ${(customer['recommended_limit'] - customer['current_limit']) * 0.15:,.0f}<br>
+                        • Estimated annual revenue increase: ₹{(customer['recommended_limit'] - customer['current_limit']) * 0.15:,.0f}<br>
                         • Market timing: {"Favorable conditions" if market_data['sp500_change'] > 0 else "Cautious approach recommended"}
                     </div>
                 </div>
@@ -289,7 +501,7 @@ with tab_dashboard:
                         st.session_state.processed_customers += 1
                         revenue_impact = (customer['recommended_limit'] - customer['current_limit']) * 0.15
                         st.session_state.total_revenue_impact += revenue_impact
-                        st.success(f"✅ Changes approved for {customer['name']}! Revenue impact: ${revenue_impact:,.0f}")
+                        st.success(f"✅ Changes approved for {customer['name']}! Revenue impact: ₹{revenue_impact:,.0f}")
                         time.sleep(1)
                         st.rerun()
 
@@ -305,9 +517,9 @@ with tab_dashboard:
 
                             Customer Profile:
                             • Name: {customer['name']}
-                            • Current Limit: ${customer['current_limit']:,}
+                            • Current Limit: ₹{customer['current_limit']:,}
                             • Utilization: {customer['utilization']:.0%}
-                            • Income: ${customer['income']:,}
+                            • Income: ₹{customer['income']:,}
                             • Risk Score: {customer['risk_score']}
                             • Payment History: {customer['payment_history']}%
                             • Primary Spending: {customer.get('spending_category', 'Mixed')}
@@ -333,11 +545,11 @@ with tab_dashboard:
                                 )
                                 analysis = response.choices[0].message.content
                                 st.session_state.analysis_results[customer_key] = analysis
-                                st.session_state.show_analysis[customer_key] = True  # Show analysis
+                                st.session_state.show_analysis[customer_key] = True
                             except Exception as e:
                                 st.error(f"Analysis error: {str(e)}")
 
-                # Display analysis in properly formatted container (FIXED PART)
+                # Display analysis in properly formatted container
                 if st.session_state.show_analysis.get(customer_key, False):
                     st.markdown(f"""
                     <div class="analysis-container">
@@ -362,9 +574,10 @@ with tab_dashboard:
             <div class="metric-card">
                 <h4>Portfolio Overview</h4>
                 <div><strong>Total Customers:</strong> {total_customers}</div>
-                <div><strong>Portfolio Value:</strong> ${total_portfolio_value:,}</div>
+                <div><strong>Portfolio Value:</strong> ₹{total_portfolio_value:,}</div>
                 <div><strong>Avg Utilization:</strong> {avg_utilization:.0%}</div>
                 <div><strong>High Opportunities:</strong> {high_opportunity_count}</div>
+                <div><strong>Analyst:</strong> {st.session_state.user_info.get('name', 'Unknown')}</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -387,7 +600,7 @@ with tab_dashboard:
                 fig_pie.update_layout(height=250)
                 st.plotly_chart(fig_pie, use_container_width=True)
 
-        # --- Refresh controls (stay in Dashboard) ---
+        # --- Refresh controls ---
         r1, r2, r3 = st.columns(3)
         with r1:
             if st.button("🔄 Refresh Market Data", type="secondary"):
@@ -404,7 +617,7 @@ with tab_dashboard:
                 st.session_state.processed_customers = 0
                 st.session_state.total_revenue_impact = 0.0
                 st.session_state.analysis_results = {}
-                st.session_state.show_analysis = {}  # Clear analysis state too
+                st.session_state.show_analysis = {}
                 st.success("✅ Portfolio cleared!")
                 time.sleep(1); st.rerun()
 
@@ -416,8 +629,8 @@ with tab_dashboard:
         fig_rev = go.Figure()
         fig_rev.add_trace(go.Scatter(x=months, y=baseline, name='Conservative Estimate'))
         fig_rev.add_trace(go.Scatter(x=months, y=optimized, name='Optimistic Projection'))
-        fig_rev.update_layout(title="Revenue Impact Projection ($)", height=400,
-                              xaxis_title="Timeline", yaxis_title="Revenue Impact ($)")
+        fig_rev.update_layout(title="Revenue Impact Projection (₹)", height=400,
+                              xaxis_title="Timeline", yaxis_title="Revenue Impact (₹)")
         st.plotly_chart(fig_rev, use_container_width=True)
     else:
         st.info("👆 *Add customer data above to see real-time AI analysis and portfolio optimization!*")
@@ -432,7 +645,7 @@ def build_customers_df(customers):
     preferred = [
         "id","name","current_limit","recommended_limit","utilization","payment_history",
         "income","risk_score","opportunity","rate_reduction","spending_category",
-        "last_increase","market_context","timestamp"
+        "last_increase","market_context","added_by","timestamp"
     ]
     cols = [c for c in preferred if c in df.columns] + [c for c in df.columns if c not in preferred]
     return df[cols]
@@ -456,17 +669,17 @@ with tab_all:
         dl1, dl2 = st.columns(2)
         with dl1:
             st.download_button("⬇ Download CSV", data=csv_bytes,
-                               file_name="customers.csv", mime="text/csv",
-                               use_container_width=True)
+                               file_name=f"customers_{st.session_state.user_info.get('name', 'user').replace(' ', '_')}.csv", 
+                               mime="text/csv", use_container_width=True)
         with dl2:
             st.download_button("⬇ Download Excel", data=excel_buf,
-                               file_name="customers.xlsx",
+                               file_name=f"customers_{st.session_state.user_info.get('name', 'user').replace(' ', '_')}.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                use_container_width=True)
 
 # ----------------------------- FOOTER STRAP -----------------------------
 st.markdown("---")
-st.markdown("""
+st.markdown(f"""
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 2rem; border-radius: 15px; text-align: center;">
     <h3>Credit Intelligence Engine</h3>
     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; margin: 1rem 0;">
@@ -476,5 +689,9 @@ st.markdown("""
         <div><h4 style="color: #dc3545;">Measurable</h4><p>Business Impact</p></div>
     </div>
     <p><strong>Revolutionary Credit Intelligence • Live Market Integration • Immediate ROI Calculation</strong></p>
+    <p style="margin-top: 1rem; font-size: 0.9rem; color: #666;">
+        🔐 Secured by Google OAuth • Session managed by {st.session_state.user_info.get('name', 'User')} • 
+        {len(st.session_state.customers)} customers analyzed
+    </p>
 </div>
 """, unsafe_allow_html=True)
