@@ -14,16 +14,13 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
     ADMIN_EMAILS = os.getenv("ADMIN_EMAILS", "").split(",")
 
-    # OAuth URLs
-    GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/auth"
-    GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
-    GOOGLE_USER_INFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
+    # OAuth URLs (use .env values if present, else defaults)
+    GOOGLE_AUTH_URL = os.getenv("GOOGLE_AUTH_URL", "https://accounts.google.com/o/oauth2/v2/auth")
+    GOOGLE_TOKEN_URL = os.getenv("GOOGLE_TOKEN_URL", "https://oauth2.googleapis.com/token")
+    GOOGLE_USER_INFO_URL = os.getenv("GOOGLE_USER_INFO_URL", "https://www.googleapis.com/oauth2/v2/userinfo")
 
-    # OAuth Scopes
-    GOOGLE_SCOPES = [
-        "https://www.googleapis.com/auth/userinfo.email",
-        "https://www.googleapis.com/auth/userinfo.profile"
-    ]
+    # OAuth Scopes (use .env value if present, else default)
+    GOOGLE_SCOPES = os.getenv("GOOGLE_SCOPES", "openid email profile").split()
 
     @classmethod
     def validate_config(cls):
