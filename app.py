@@ -15,7 +15,7 @@ import yfinance as yf
 load_dotenv()
 
 st.set_page_config(
-    page_title="Synchrony Credit Intelligence Engine",
+    page_title="Credit Intelligence Engine",
     page_icon="🧠",
     layout="wide"
 )
@@ -184,7 +184,7 @@ if 'show_analysis' not in st.session_state:
 # Header
 st.markdown("""
 <div class="hero-container">
-    <h1>🧠 Synchrony Credit Intelligence Engine</h1>
+    <h1>Credit Intelligence Engine</h1>
     <h3>Real-Time Credit Optimization & Revenue Maximization</h3>
     <p><span class="real-time-indicator">🔴 LIVE</span> AI-Powered Customer Portfolio Management</p>
 </div>
@@ -226,7 +226,7 @@ with col4:
 # User input section for real customer data
 st.markdown("""
 <div class="input-section">
-    <h3>📝 Add Real Customer Data</h3>
+    <h3>Add Real Customer Data</h3>
     <p>Input actual customer information for AI analysis and credit optimization</p>
 </div>
 """, unsafe_allow_html=True)
@@ -341,7 +341,7 @@ if submitted:
 
 # Display customer analysis
 if st.session_state.customers:
-    st.markdown("### 🎯 Real Customer Portfolio Analysis")
+    st.markdown("###Customer Portfolio Analysis")
 
     # Main analysis area
     col1, col2 = st.columns([2, 1])
@@ -434,7 +434,7 @@ if st.session_state.customers:
             if st.session_state.show_analysis.get(customer_key, False):
                 st.markdown(f"""
                 <div class="analysis-container">
-                    <h4>🧠 AI Strategic Analysis - {customer['name']}</h4>
+                    <h4> Strategic Analysis - {customer['name']}</h4>
                     <div style="white-space: pre-wrap; line-height: 1.5; font-size: 0.9rem;">
 {st.session_state.analysis_results[customer_key]}
                     </div>
@@ -455,7 +455,7 @@ if st.session_state.customers:
 
         st.markdown(f"""
         <div class="metric-card">
-            <h4>📈 Portfolio Overview</h4>
+            <h4>Portfolio Overview</h4>
             <div><strong>Total Customers:</strong> {total_customers}</div>
             <div><strong>Portfolio Value:</strong> ${total_portfolio_value:,}</div>
             <div><strong>Avg Utilization:</strong> {avg_utilization:.0%}</div>
@@ -465,7 +465,7 @@ if st.session_state.customers:
 
         st.markdown(f"""
         <div class="metric-card">
-            <h4>🎯 Session Performance</h4>
+            <h4>Session Performance</h4>
             <div><strong>Customers Added:</strong> {total_customers}</div>
             <div><strong>Processed:</strong> {st.session_state.processed_customers}</div>
             <div><strong>Revenue Impact:</strong> ${st.session_state.total_revenue_impact:,.0f}</div>
@@ -532,7 +532,7 @@ with col_refresh3:
 # Footer with real metrics
 if st.session_state.customers:
     st.markdown("---")
-    st.markdown("### 📈 Real Portfolio Impact Analysis")
+    st.markdown("### Portfolio Impact Analysis")
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -579,7 +579,7 @@ else:
 st.markdown("---")
 st.markdown("""
 <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 2rem; border-radius: 15px; text-align: center;">
-    <h3>🚀 Synchrony Credit Intelligence Engine</h3>
+    <h3>Credit Intelligence Engine</h3>
     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; margin: 1rem 0;">
         <div><h4 style="color: #28a745;">Real-Time</h4><p>Market Data Integration</p></div>
         <div><h4 style="color: #007bff;">AI-Powered</h4><p>Credit Optimization</p></div>
