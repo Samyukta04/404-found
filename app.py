@@ -280,6 +280,77 @@ with tab_dashboard:
                 </div>
                 """, unsafe_allow_html=True)
 
+                # --- Action buttons ---
+                col_a, col_b, col_c = st.columns(3)
+                customer_key = customer['id']
+
+                with col_a:
+                    if st.button("✅ Approve", key=f"approve_{customer_key}_{i}_main"):
+                        st.session_state.processed_customers += 1
+                        revenue_impact = (customer['recommended_limit'] - customer['current_limit']) * 0.15
+                        st.session_state.total_revenue_impact += revenue_impact
+                        st.success(f"✅ Changes approved for {customer['name']}! Revenue impact: ${revenue_impact:,.0f}")
+                        time.sleep(1)
+                        st.rerun()
+
+                with col_b:
+                    if st.button("📧 Send Offer", key=f"offer_{customer_key}_{i}_main"):
+                        st.info(f"📧 Personalized offer sent to {customer['name']}")
+
+                with col_c:
+                    if st.button("📊 AI Analysis", key=f"analyze_{customer_key}_{i}_main"):
+                        with st.spinner("🧠 AI analyzing customer profile..."):
+                            analysis_prompt = f"""
+                            As a senior Synchrony credit analyst, provide strategic recommendations for this customer:
+
+                            Customer Profile:
+                            • Name: {customer['name']}
+                            • Current Limit: ${customer['current_limit']:,}
+                            • Utilization: {customer['utilization']:.0%}
+                            • Income: ${customer['income']:,}
+                            • Risk Score: {customer['risk_score']}
+                            • Payment History: {customer['payment_history']}%
+                            • Primary Spending: {customer.get('spending_category', 'Mixed')}
+                            • Market Context: {customer['market_context']}
+                            • Current Market: S&P {market_data['sp500_change']:+.1f}%, VIX {market_data['vix_level']:.1f}
+
+                            Provide analysis in these 4 sections (2-3 lines each):
+
+                            1. RISK ASSESSMENT:
+                            2. REVENUE OPPORTUNITY:
+                            3. MARKET TIMING:
+                            4. STRATEGIC RECOMMENDATION:
+
+                            Keep response concise and actionable.
+                            """
+
+                            try:
+                                response = client.chat.completions.create(
+                                    model="llama-3.3-70b-versatile",
+                                    messages=[{"role": "user", "content": analysis_prompt}],
+                                    max_tokens=350,
+                                    temperature=0.7
+                                )
+                                analysis = response.choices[0].message.content
+                                st.session_state.analysis_results[customer_key] = analysis
+                                st.session_state.show_analysis[customer_key] = True  # Show analysis
+                            except Exception as e:
+                                st.error(f"Analysis error: {str(e)}")
+
+                # Display analysis in properly formatted container (FIXED PART)
+                if st.session_state.show_analysis.get(customer_key, False):
+                    st.markdown(f"""
+                    <div class="analysis-container">
+                        <h4>🧠 AI Strategic Analysis - {customer['name']}</h4>
+                        <div style="white-space: pre-wrap; line-height: 1.5; font-size: 0.9rem;">
+{st.session_state.analysis_results[customer_key]}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    if st.button(f"🟥 ✕ Close Analysis", key=f"close_{customer_key}_{i}"):
+                        st.session_state.show_analysis[customer_key] = False
+                        st.rerun()
+
         with right:
             st.markdown("### 📊 Real-Time Portfolio Metrics")
             total_customers = len(st.session_state.customers)
@@ -333,6 +404,7 @@ with tab_dashboard:
                 st.session_state.processed_customers = 0
                 st.session_state.total_revenue_impact = 0.0
                 st.session_state.analysis_results = {}
+                st.session_state.show_analysis = {}  # Clear analysis state too
                 st.success("✅ Portfolio cleared!")
                 time.sleep(1); st.rerun()
 

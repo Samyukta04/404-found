@@ -37,8 +37,8 @@ class GoogleOAuth:
 
     def exchange_code_for_token(self, code, state):
         """Exchange authorization code for access token"""
-        if state != st.session_state.get('oauth_state'):
-            raise ValueError("Invalid state parameter")
+        if 'oauth_state' not in st.session_state:
+            st.session_state.oauth_state = secrets.token_urlsafe(32)
 
         data = {
             'client_id': self.client_id,
